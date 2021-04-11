@@ -11,7 +11,7 @@ use serenity::{
         standard::macros::group,
     },
     http::Http,
-    model::{event::ResumedEvent, gateway::Ready, id::ChannelId},
+    model::{event::ResumedEvent, gateway::Ready, gateway::Activity, id::GuildId},
     prelude::*,
 };
 use anyhow::Result;
@@ -23,16 +23,11 @@ use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter}
 };
 
-use serenity::model::gateway::Activity;
-use serenity::model::id::GuildId;
-
-
 mod commands;
 use commands::{
-    // math::*,
-    // meta::*,
     owner::*,
     fund_commands::*,
+    invictus_api::*
 };
 
 
@@ -51,7 +46,6 @@ struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
-        // let mut counter = 1;
         loop {
             let server = GuildId(830580361632153630); // test server guild id
             let mut status_message = nav_status().await;
@@ -60,7 +54,6 @@ impl EventHandler for Handler {
             ctx.set_activity(Activity::playing(format!("24h {}%", api_c10_mov_time("24".into()).await.unwrap()))).await;
             server.edit_nickname(&ctx.http, Some(&format!("C10 NAV {}$", status_message))).await.unwrap();
             tokio::time::sleep(tokio::time::Duration::from_millis(60000)).await;
-            // counter += 1;
         }
     }
 
@@ -82,8 +75,7 @@ async fn main() {
     info!("Botconfig loaded {:?}", &config);
 
     let filter = EnvFilter::from_default_env()
-        // Set the base level when not matched by other directives to INFO.
-        .add_directive(LevelFilter::INFO.into());
+        .add_directive(LevelFilter::INFO.into());// Set the base level when not matched by other directives to INFO.
 
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(filter)
