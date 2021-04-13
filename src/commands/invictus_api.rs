@@ -1,5 +1,5 @@
 use serde_derive::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ApiFundsGeneral {
@@ -17,10 +17,27 @@ pub struct FundGeneral {
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Asset {
-    name: String,
-    ticker: String,
-    usd_value: String
+    pub name: String,
+    pub ticker: String,
+    pub usd_value: String
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Crypto10Pie {
+    status: String,
+    pub assets: Vec<PieAsset>
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PieAsset {
+    pub ticker: String,
+    pub name: String,
+    pub value: String,
+    pub amount: String,
+    pub price: String,
+    pub percentage: String
+}
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Crypto10 {
@@ -31,8 +48,9 @@ pub struct Crypto10 {
     name: String,
     ticker: String,
     price: String,
-    assets: Vec<Asset>
+    pub assets: Vec<Asset>
 }
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FundMovement {
@@ -40,14 +58,23 @@ pub struct FundMovement {
     percentage: String
 }
 
+impl Crypto10Pie {
+    pub fn remove_zero_asset(&mut self) {
+        self.assets.retain(|asset| asset.percentage != "0.00".to_string());
+    }
+}
+
+impl Crypto10 {
+    pub fn net_fund_value(&self) -> String {
+        self.net_asset_value.clone()
+    }
+}
+
 pub async fn api_general() -> Result<ApiFundsGeneral> {
     let api_response = reqwest::get("https://api.invictuscapital.com/v2/funds")
         .await?
         .json::<ApiFundsGeneral>()
         .await?;
-    // println!("{:?}", api_response);
-
-    // let funds: funds = api_response;
     Ok(api_response)
 }
 
@@ -56,9 +83,6 @@ pub async fn api_c10_full() -> Result<Crypto10> {
         .await?
         .json::<Crypto10>()
         .await?;
-    // println!("{:?}", api_response);
-
-    // let funds: funds = api_response;
     Ok(api_response)
 }
 
@@ -75,6 +99,16 @@ pub async fn api_c10_mov() -> Result<String> {
     }
     
     Ok(movements)
+}
+
+pub async fn api_c10_pie() -> Result<Crypto10Pie> {
+
+    let pie = reqwest::get("https://api.invictuscapital.com/v2/funds/crypto10/pie")
+        .await?
+        .json::<Crypto10Pie>()
+        .await?;
+    
+    Ok(pie)
 }
 
 pub async fn api_c10_mov_time(timeframe: String) -> Result<String> {

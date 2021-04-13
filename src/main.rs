@@ -14,8 +14,6 @@ use serenity::{
     model::{event::ResumedEvent, gateway::Ready, gateway::Activity, id::GuildId},
     prelude::*,
 };
-use anyhow::Result;
-use serde_derive::Deserialize;
 
 use tracing::{error, info, debug};
 use tracing_subscriber::{
@@ -30,9 +28,11 @@ use commands::{
     invictus_api::*
 };
 
+mod utils;
+
 
 #[group]
-#[commands(quit, nav, full, mov)]
+#[commands(quit, nav, /*full,*/ mov, stats)]
 struct General;
 pub struct ShardManagerContainer;
 
@@ -47,13 +47,8 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
         loop {
-            let server = GuildId(830580361632153630); // test server guild id
-            let mut status_message = nav_status().await;
-            status_message.truncate(5);
-
             ctx.set_activity(Activity::playing(format!("24h {}%", api_c10_mov_time("24".into()).await.unwrap()))).await;
-            server.edit_nickname(&ctx.http, Some(&format!("C10 NAV {}$", status_message))).await.unwrap();
-            tokio::time::sleep(tokio::time::Duration::from_millis(60000)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
         }
     }
 
@@ -62,16 +57,10 @@ impl EventHandler for Handler {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct Config {
-    bot_token: String,
-    prefix: String,
-    allowed_channels: Vec<String>
-}
 
 #[tokio::main]
 async fn main() {
-    let config: Config = loadconfig().expect("Can't load config file: botconfig.toml. Please make sure you have one next to the executable and it's correct.");
+    let config: utils::Config = utils::loadconfig().expect("Can't load config file: botconfig.toml. Please make sure you have one next to the executable and it's correct.");
     info!("Botconfig loaded {:?}", &config);
 
     let filter = EnvFilter::from_default_env()
@@ -94,6 +83,16 @@ async fn main() {
         },
         Err(why) => panic!("Could not access application info: {:?}", why),
     };
+
+    // Start nicname update with nav
+    tokio::spawn(async move {
+        utils::update_nick(&http).await;
+    });
+    let http2 = Http::new_with_token(&config.bot_token);
+
+    tokio::spawn(async move {
+        utils::c10_rebalance_check(&http2).await;
+    });
 
     // Create the framework
     let framework = StandardFramework::new()
@@ -123,11 +122,4 @@ async fn main() {
     if let Err(why) = client.start().await {
         error!("Client error: {:?}", why);
     }
-}
-
-// Loading bot config file.
-fn loadconfig() -> Result<Config> {
-    let configtoml = std::fs::read_to_string("botconfig.toml")?;
-    let config: Config = toml::from_str(&configtoml)?;
-    Ok(config)
 }
