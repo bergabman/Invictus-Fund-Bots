@@ -33,7 +33,7 @@ pub async fn mov(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 #[command]
 pub async fn stats(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let mut api_response = invictus_api::api_c10_pie().await?;
-    api_response.remove_zero_asset();
+    api_response.remove_small_assets();
 
     let net_value = invictus_api::api_c10_full().await?;
 
@@ -52,7 +52,7 @@ pub async fn stats(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 pub async fn info(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 
     let mut api_response = invictus_api::api_c10_pie().await?;
-    api_response.remove_zero_asset();
+    api_response.remove_small_assets();
 
     let net_value = invictus_api::api_c10_full().await?;
 

@@ -38,7 +38,6 @@ pub struct PieAsset {
     pub percentage: String
 }
 
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Crypto10 {
     status: String,
@@ -51,7 +50,6 @@ pub struct Crypto10 {
     pub assets: Vec<Asset>
 }
 
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FundMovement {
     status: String,
@@ -59,8 +57,25 @@ pub struct FundMovement {
 }
 
 impl Crypto10Pie {
-    pub fn remove_zero_asset(&mut self) {
-        self.assets.retain(|asset| asset.percentage != "0.00".to_string());
+    /// remove assets from list that are smaller than 0.1% of the fund. Mostly DASH investments and assets with 0 value
+    pub fn remove_small_assets(&mut self) {
+        self.assets.retain(|asset| (asset.percentage.parse::<f64>().unwrap()) > 0.1 || asset.ticker == "USD");
+    }
+
+    pub fn get_cash_allocation_percent(&self, net_asset_value: String) -> Option<f64> {
+        for asset in &self.assets {
+            if asset.ticker == "USD" {
+                // return Some();
+                return Some(asset.percentage.parse::<f64>().unwrap())
+                // let asset_value = asset.value.clone().parse::<f64>().unwrap();
+                // let fund_value = net_asset_value.parse::<f64>().unwrap();
+                // // let allocation = ( asset_value / fund_value ) as i64 * 100;
+                // let allocation =  asset_value / fund_value * 100.0 ;
+                // println!("allocation {} net asset {} value {}",allocation , fund_value, asset_value);
+                // return Some(allocation as i64)
+            }
+        }
+        return None;
     }
 }
 

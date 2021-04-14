@@ -59,41 +59,88 @@ pub fn loadconfig() -> Result<Config> {
 
 pub async fn c10_rebalance_check(http: &Http) {
 
-    let mut previous_values: Vec<PieAsset> = vec![];
+    let mut previous_asset_values: Vec<PieAsset> = vec![];
+    let mut previous_cash_allocation: Option<f64> = None;
+    // let rebalance_channel = ChannelId(831545825753694229); //  rebalance channel ID in test server
+    let rebalance_channel = ChannelId(830739714054291486); //  bot-test channel ID in test server
+
 
     loop {
+        let mut cash_rebalanced = false;
         let mut api_response = match api_c10_pie().await {
             Ok(response) => response,
             Err(e) => {
-                info!("c10_rebalance_check failed to retrieve data from the api\n{}", e);
+                info!("c10_rebalance_check failed to retrieve pie data from the api\n{}", e);
                 sleep(Duration::from_secs(10)).await;
                 continue;
             } 
         };
-        api_response.remove_zero_asset();
+        api_response.remove_small_assets();
         debug!("api response {:?}", &api_response);
-        let current_values = api_response.assets.clone();
-        debug!("current values {:?}", &current_values);
-        if previous_values.is_empty() {
-            previous_values = current_values.clone();
+        let current_asset_values = api_response.assets.clone();
+        debug!("current values {:?}", &current_asset_values);
+        if previous_asset_values.is_empty() {
+            previous_asset_values = current_asset_values.clone();
+        }
+        let c10_full = match api_c10_full().await {
+            Ok(value) => value,
+            Err(e) => {
+                info!("c10_rebalance_check failed to retrieve full c10 data from the api\n{}", e);
+                sleep(Duration::from_secs(10)).await;
+                continue;
+            },
+        };
+        // compare cash allocation
+        let current_cash_allocation = api_response.get_cash_allocation_percent(c10_full.net_fund_value());
+        if previous_cash_allocation.is_none() {
+            previous_cash_allocation = current_cash_allocation;
         }
 
-        let (rebalanced, assetcomparison) = compare_assets(current_values.clone(), previous_values.clone());
+        let allowed_percentage_difference = 10.0;
+        let mut cash_rebalance_string = String::from("Assets moved to ");
+        if (previous_cash_allocation.unwrap() + allowed_percentage_difference) < current_cash_allocation.unwrap() {
+            //moved to cash
+            cash_rebalanced = true;
+            cash_rebalance_string.push_str("Cash")
 
-        previous_values = current_values;
-        if rebalanced {
+        } else if (previous_cash_allocation.expect("prev cash alloc1") + allowed_percentage_difference) > current_cash_allocation.expect("current cash 1") {
+            //moved to crypto
+            cash_rebalanced = true;
+            cash_rebalance_string.push_str("Crypto")
+        }
+        // compare crypto assets
+        let (crypto_rebalanced, comparison_summary) = compare_assets(current_asset_values.clone(), previous_asset_values.clone());
+        previous_asset_values = current_asset_values.clone();
+
+        if crypto_rebalanced || cash_rebalanced {
             let net_value = match api_c10_full().await {
                 Ok(value) => (value.net_fund_value().parse::<f64>().unwrap()) as i64,
                 Err(_) => 0,
             };
-            let channel = ChannelId(831545825753694229); //  rebalance channel ID in test server
             let mut summary = String::new();
-            for asset in api_response.assets {
-                summary.push_str(&format!("**{}**: {}%\n", asset.ticker, asset.percentage));
+            summary.push_str(&format!(":tada:**  C10 Rebalanced!  **:tada:\n**Fund Net Value: **${}\n",net_value.separate_with_commas()));
+            if cash_rebalanced {
+                summary.push_str(&format!("*{}*\n",cash_rebalance_string));
             }
-            channel.say(http, format!(":tada:**  C10 Rebalanced!  **:tada:\nFund Net Value: **{}**\n{}",net_value.separate_with_commas(), assetcomparison)).await.unwrap();
+            for asset in api_response.assets {
+                if asset.ticker != "USD" {
+                    summary.push_str(&format!("**{}**: {}%\n", asset.ticker, asset.percentage));
+                }
+            }
+            let usd_asset_value_string = current_asset_values.iter().filter(|f| f.ticker == "USD").next().unwrap();
+            let usd_asset = usd_asset_value_string.value.parse::<f64>().unwrap() as i64;
+
+            summary.push_str(&format!("**Cash allocation(USD):** {}% ${}", current_cash_allocation.unwrap(), usd_asset.separate_with_commas()));
+
+            // if let Err(why) = rebalance_channel.say(http,  comparison_summary).await {
+                if let Err(why) = rebalance_channel.say(http,  summary).await {
+                info!("c10_rebalance_check failed to send alert\n{}", why);
+                sleep(Duration::from_secs(10)).await;
+                continue;    
+            };
 
         }
+
         sleep(Duration::from_secs(300)).await;
     }
 }
@@ -104,6 +151,9 @@ fn compare_assets(previous_values: Vec<PieAsset>, current_values: Vec<PieAsset>)
     let mut rebalanced = false;
     let mut return_value = String::new();
     for asset_curr in current_values {
+        if asset_curr.ticker == "USD" {
+            continue;
+        }
         let mut asset_found = false;
         for asset_prev in &previous_values {
             if asset_prev.name == asset_curr.name {
