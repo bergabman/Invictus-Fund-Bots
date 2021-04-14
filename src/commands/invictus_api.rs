@@ -95,7 +95,7 @@ pub async fn api_c10_mov() -> Result<String> {
         .await?
         .json::<FundMovement>()
         .await?;
-        movements.push_str(&format!("| {}h {}% ", range, fund_movement.percentage));
+        movements.push_str(&format!("**{}h** {}%\n", range, fund_movement.percentage));
     }
     
     Ok(movements)

@@ -9,6 +9,7 @@ use serenity::{
 
 use tracing::{error, info, debug};
 use tokio::time::{sleep, Duration};
+use thousands::Separable;
 use crate::commands::invictus_api::*;
 
 pub async fn update_nick(http: &Http) {
@@ -81,16 +82,16 @@ pub async fn c10_rebalance_check(http: &Http) {
 
         previous_values = current_values;
         if rebalanced {
-            let fund_net_value = match api_c10_full().await {
-                Ok(value) => value.net_fund_value(),
-                Err(_) => "NaN".into(),
+            let net_value = match api_c10_full().await {
+                Ok(value) => (value.net_fund_value().parse::<f64>().unwrap()) as i64,
+                Err(_) => 0,
             };
             let channel = ChannelId(831545825753694229); //  rebalance channel ID in test server
             let mut summary = String::new();
             for asset in api_response.assets {
                 summary.push_str(&format!("**{}**: {}%\n", asset.ticker, asset.percentage));
             }
-            channel.say(http, format!(":tada:**  C10 Rebalanced!  **:tada:\nFund Net Value: **{}**\n{}", fund_net_value, assetcomparison)).await.unwrap();
+            channel.say(http, format!(":tada:**  C10 Rebalanced!  **:tada:\nFund Net Value: **{}**\n{}",net_value.separate_with_commas(), assetcomparison)).await.unwrap();
 
         }
         sleep(Duration::from_secs(300)).await;
@@ -111,7 +112,7 @@ fn compare_assets(previous_values: Vec<PieAsset>, current_values: Vec<PieAsset>)
                 let previous_amount:f64 = asset_prev.amount.parse().unwrap();
                 // previous_amount = previous_amount + 10.0; // testing
                 let compared = (current_amount / previous_amount * 100.0) as i64;
-                if compared < 95 || compared > 105 { // if asset token amount differs with 5%, we assume that we rebalanced
+                if compared < 85 || compared > 115 { // if asset token amount differs with 5%, we assume that we rebalanced
                     rebalanced = true;
                 }
 
