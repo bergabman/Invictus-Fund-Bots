@@ -42,7 +42,7 @@ pub async fn stats(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let mut summary = String::from(format!("**Fund Net Value**: ${}\n", fund_net_value.separate_with_commas()));
     for asset in api_response.assets {
         let asset_usd = (asset.value.parse::<f64>().unwrap()) as i64;
-        summary.push_str(&format!("**{}**: {}% ${}\n", asset.ticker, asset.percentage, asset_usd.separate_with_commas()));
+        summary.push_str(&format!("**{} {}%** ${}\n", asset.ticker, asset.percentage, asset_usd.separate_with_commas()));
     }
     msg.channel_id.say(&ctx.http, format!("{}", summary)).await?;
     Ok(())
@@ -59,7 +59,7 @@ pub async fn info(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let fund_net_value: i64 = (net_value.net_fund_value().parse::<f64>().unwrap()) as i64;
 
 
-    let mut net_value = String::from(format!("**Fund Net Value**: ${}\n", fund_net_value.separate_with_commas()));
+    let net_value = String::from(format!("**Fund Net Value**: ${}\n", fund_net_value.separate_with_commas()));
     let mut assets_vec = vec![];
     for asset in api_response.assets {
         let (one, two, three) = (format!("**{}**: {}% ${}\n", asset.ticker, asset.percentage, asset.value.separate_with_commas()), "", true);
@@ -67,7 +67,7 @@ pub async fn info(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     }
     let _ = msg.channel_id.send_message(&ctx.http, |m| {
         // m.content("test");
-        m.embed(|mut e| {
+        m.embed(|e| {
             e.title(net_value);
             // e.description("With a description");
             e.thumbnail("https://cdn.discordapp.com/attachments/519973500535046148/831645350548734002/c10_.png");

@@ -11,7 +11,7 @@ use serenity::{
         standard::macros::group,
     },
     http::Http,
-    model::{event::ResumedEvent, gateway::Ready, gateway::Activity, id::GuildId},
+    model::{event::ResumedEvent, gateway::Ready, gateway::Activity, /*id::GuildId*/},
     prelude::*,
 };
 
@@ -32,7 +32,7 @@ mod utils;
 
 
 #[group]
-#[commands(quit, nav, /*full,*/ mov, stats, info)]
+#[commands(quit, nav, mov, stats, info)]
 struct General;
 pub struct ShardManagerContainer;
 

@@ -7,7 +7,7 @@ use serenity::{
     // model::gateway::Activity,
     };
 
-use tracing::{error, info, debug};
+use tracing::{info, debug};
 use tokio::time::{sleep, Duration};
 use thousands::Separable;
 use crate::commands::invictus_api::*;
@@ -60,13 +60,10 @@ pub fn loadconfig() -> Result<Config> {
 pub async fn c10_rebalance_check(http: &Http) {
 
     let mut previous_asset_values: Vec<PieAsset> = vec![];
-    let mut previous_cash_allocation: Option<f64> = None;
-    // let rebalance_channel = ChannelId(831545825753694229); //  rebalance channel ID in test server
-    let rebalance_channel = ChannelId(830739714054291486); //  bot-test channel ID in test server
-
+    let rebalance_channel = ChannelId(831545825753694229); //  rebalance channel ID in test server
+    // let rebalance_channel = ChannelId(830739714054291486); //  bot-test channel ID in test server
 
     loop {
-        let mut cash_rebalanced = false;
         let mut api_response = match api_c10_pie().await {
             Ok(response) => response,
             Err(e) => {
@@ -82,99 +79,149 @@ pub async fn c10_rebalance_check(http: &Http) {
         if previous_asset_values.is_empty() {
             previous_asset_values = current_asset_values.clone();
         }
-        let c10_full = match api_c10_full().await {
-            Ok(value) => value,
-            Err(e) => {
-                info!("c10_rebalance_check failed to retrieve full c10 data from the api\n{}", e);
-                sleep(Duration::from_secs(10)).await;
-                continue;
-            },
-        };
-        // compare cash allocation
-        let current_cash_allocation = api_response.get_cash_allocation_percent(c10_full.net_fund_value());
-        if previous_cash_allocation.is_none() {
-            previous_cash_allocation = current_cash_allocation;
-        }
 
-        let allowed_percentage_difference = 10.0;
-        let mut cash_rebalance_string = String::from("Assets moved to ");
-        if (previous_cash_allocation.unwrap() + allowed_percentage_difference) < current_cash_allocation.unwrap() {
-            //moved to cash
-            cash_rebalanced = true;
-            cash_rebalance_string.push_str("Cash")
+        // Rebalance control struct to hold all the data needed for the check
+        let mut control = RebalanceControl::new(
+            previous_asset_values.clone(),
+            current_asset_values, 
+            10.0,
+        );
 
-        } else if (previous_cash_allocation.expect("prev cash alloc1") - allowed_percentage_difference) > current_cash_allocation.expect("current cash 1") {
-            //moved to crypto
-            cash_rebalanced = true;
-            cash_rebalance_string.push_str("Crypto")
-        }
-        // compare crypto assets
-        let (crypto_rebalanced, comparison_summary) = compare_assets(current_asset_values.clone(), previous_asset_values.clone());
-        previous_asset_values = current_asset_values.clone();
+        control.run();
 
-        if crypto_rebalanced || cash_rebalanced {
+        if control.cash_rebalanced || control.crypto_rebalanced {
             let net_value = match api_c10_full().await {
                 Ok(value) => (value.net_fund_value().parse::<f64>().unwrap()) as i64,
                 Err(_) => 0,
             };
-            let mut summary = String::new();
-            summary.push_str(&format!(":tada:**  C10 Rebalanced!  **:tada:\n**Fund Net Value: **${}\n",net_value.separate_with_commas()));
-            if cash_rebalanced {
-                summary.push_str(&format!("*{}*\n",cash_rebalance_string));
+            let mut rebalance_message = String::new();
+            rebalance_message.push_str(&format!(":tada:**  C10 Rebalanced!  **:tada:\n**Fund Net Value: **${}\n", net_value.separate_with_commas()));
+            if control.cash_rebalanced {
+                rebalance_message.push_str(&format!("*{}*\n", control.value_moved_to ));
+            } else {
+                rebalance_message.push_str(&format!("*Crypto assets rebalanced*\n",));
             }
-            for asset in api_response.assets {
-                if asset.ticker != "USD" {
-                    summary.push_str(&format!("**{}**: {}%\n", asset.ticker, asset.percentage));
-                }
-            }
-            let usd_asset_value_string = current_asset_values.iter().filter(|f| f.ticker == "USD").next().unwrap();
-            let usd_asset = usd_asset_value_string.value.parse::<f64>().unwrap() as i64;
 
-            summary.push_str(&format!("**Cash allocation(USD):** {}% ${}", current_cash_allocation.unwrap(), usd_asset.separate_with_commas()));
+            rebalance_message.push_str(&format!("{}", control.asset_summary));
 
-            // if let Err(why) = rebalance_channel.say(http,  comparison_summary).await {
-                if let Err(why) = rebalance_channel.say(http,  summary).await {
+            if let Err(why) = rebalance_channel.say(http,  rebalance_message).await {
                 info!("c10_rebalance_check failed to send alert\n{}", why);
                 sleep(Duration::from_secs(10)).await;
                 continue;    
             };
-
+            previous_asset_values = control.current_values;
         }
 
-        sleep(Duration::from_secs(300)).await;
+        sleep(Duration::from_secs(5)).await;
     }
 }
 
-fn compare_assets(previous_values: Vec<PieAsset>, current_values: Vec<PieAsset>) -> (bool, String) {
-    // comparing current assets with previous dataset
-    // filters: asset still in fund; amount of token difference bigger than 5%
-    let mut rebalanced = false;
+fn rebalance_control(previous_values: Vec<PieAsset>, current_values: Vec<PieAsset>) -> (bool, bool, String) { // crypto rebalanced, cash rebalanced, moved value to where (crypto, cash)
+
+    let movement_tolerance = 10.0; // %
+    let mut crypto_rebalanced = false;
+    let mut cash_rebalanced = false;
     let mut return_value = String::new();
+
     for asset_curr in current_values {
-        if asset_curr.ticker == "USD" {
-            continue;
-        }
+        
         let mut asset_found = false;
         for asset_prev in &previous_values {
-            if asset_prev.name == asset_curr.name {
+            if asset_curr.name == asset_prev.name {
                 asset_found = true;
-                let current_amount:f64 = asset_curr.amount.parse().unwrap();
-                let previous_amount:f64 = asset_prev.amount.parse().unwrap();
+                let current_percentage:f64 = asset_curr.percentage.parse().unwrap();
+                let previous_percentage:f64 = asset_prev.percentage.parse().unwrap();
+                
                 // previous_amount = previous_amount + 10.0; // testing
-                let compared = (current_amount / previous_amount * 100.0) as i64;
-                if compared < 85 || compared > 115 { // if asset token amount differs with 5%, we assume that we rebalanced
-                    rebalanced = true;
-                }
+                if (current_percentage + movement_tolerance) > previous_percentage {           // asset allocation increased compared to previous dataset
+                    if asset_curr.ticker == "USD" {
+                        cash_rebalanced = true;
+                    } else {
+                        crypto_rebalanced = true;
+                    }
 
-                debug!("**{}** amount *({})*, **{}%** of previous *({})*",asset_curr.ticker, current_amount, compared, previous_amount);
-                return_value.push_str(&format!("**{}** amount *({})*, **{}%** of previous *({})*\n",asset_curr.ticker, current_amount, compared, previous_amount));
+                } else if (current_percentage - movement_tolerance) < previous_percentage {    // asset allocation decreased compared to previous dataset
+                    if asset_curr.ticker == "USD" {
+                        cash_rebalanced = true;
+                    } else {
+                        crypto_rebalanced = true;
+                    }
+                }
+                // let compared = (current_percentage / previous_percentage * 100.0) as i64;
+                // if compared < 85 || compared > 115 { // if asset token amount differs with 5%, we assume that a rebalance happened 
+                // }
+
+                debug!("**{}** percentage **{}%** was **{}%**\n",asset_curr.ticker, current_percentage, previous_percentage);
+                return_value.push_str(&format!("**{}** percentage **{}%** was **{}%**\n",asset_curr.ticker, current_percentage, previous_percentage));
             }
         }
-        if !asset_found { // if we can't find one of the assets in the previous dataset that is part of the fund now, we can assume that we rebalanced
-            rebalanced = true;
+        if !asset_found { // if we can't find one of the assets in the previous dataset that is part of the fund now, we can assume that a rebalance happened 
+            crypto_rebalanced = true;
             return_value.push_str(&format!("**{}** new token in the fund *({})*\n", asset_curr.ticker, asset_curr.amount));
         }
     }
 
-    (rebalanced, return_value)
+    (crypto_rebalanced, cash_rebalanced, return_value)
+}
+struct RebalanceControl {
+    previous_values: Vec<PieAsset>,
+    current_values: Vec<PieAsset>,
+    movement_tolerance: f64,
+    crypto_rebalanced: bool,
+    cash_rebalanced: bool,
+    value_moved_to: String,
+    asset_summary: String
+}
+
+impl RebalanceControl {
+    fn new (previous_values: Vec<PieAsset>, current_values: Vec<PieAsset>, movement_tolerance: f64) -> Self {
+        Self {
+            previous_values,
+            current_values,
+            movement_tolerance,
+            crypto_rebalanced: false,
+            cash_rebalanced: false,
+            value_moved_to: "".to_string(),
+            asset_summary: "".to_string()
+        }
+    }
+
+    fn run(&mut self) {
+        for asset_curr in &self.current_values {
+            let mut asset_found = false;
+            for asset_prev in &self.previous_values {
+                if asset_curr.name == asset_prev.name {
+                    asset_found = true;
+                    let current_percentage:f64 = asset_curr.percentage.parse().unwrap();
+                    let previous_percentage:f64 = asset_prev.percentage.parse().unwrap();
+                    // if asset_curr.ticker == "USD" {
+                    //     current_percentage += 11.0;
+                    // }
+                    
+                    if (current_percentage - self.movement_tolerance) > previous_percentage {           // asset allocation increased compared to previous dataset
+                        if asset_curr.ticker == "USD" {
+                            self.cash_rebalanced = true;
+                            self.value_moved_to = "Value moved to Cash".into()
+                        } else {
+                            self.crypto_rebalanced = true;
+                        }
+    
+                    } else if (current_percentage + self.movement_tolerance) < previous_percentage {    // asset allocation decreased compared to previous dataset
+                        if asset_curr.ticker == "USD" {
+                            self.cash_rebalanced = true;
+                            self.value_moved_to = "Value moved to Cryptocurrencies".into()
+                        } else {
+                            self.crypto_rebalanced = true;
+                        }
+                    }
+                    debug!("**{} {}%** *was {}%*\n",asset_curr.ticker, current_percentage, previous_percentage);
+                    self.asset_summary.push_str(&format!("**{} {}%** *(before {}%*)\n",asset_curr.ticker, current_percentage, previous_percentage));
+                }
+            }
+            if !asset_found { // if we can't find one of the assets in the previous dataset that is part of the fund now, we can assume that a rebalance happened 
+                self.crypto_rebalanced = true;
+                self.asset_summary.push_str(&format!("**{}** new token in the fund *{}%*\n", asset_curr.ticker, asset_curr.percentage ));
+            }
+        }
+    }
 }
