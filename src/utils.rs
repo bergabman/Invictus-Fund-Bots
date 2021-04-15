@@ -116,53 +116,6 @@ pub async fn c10_rebalance_check(http: &Http) {
     }
 }
 
-fn rebalance_control(previous_values: Vec<PieAsset>, current_values: Vec<PieAsset>) -> (bool, bool, String) { // crypto rebalanced, cash rebalanced, moved value to where (crypto, cash)
-
-    let movement_tolerance = 10.0; // %
-    let mut crypto_rebalanced = false;
-    let mut cash_rebalanced = false;
-    let mut return_value = String::new();
-
-    for asset_curr in current_values {
-        
-        let mut asset_found = false;
-        for asset_prev in &previous_values {
-            if asset_curr.name == asset_prev.name {
-                asset_found = true;
-                let current_percentage:f64 = asset_curr.percentage.parse().unwrap();
-                let previous_percentage:f64 = asset_prev.percentage.parse().unwrap();
-                
-                // previous_amount = previous_amount + 10.0; // testing
-                if (current_percentage + movement_tolerance) > previous_percentage {           // asset allocation increased compared to previous dataset
-                    if asset_curr.ticker == "USD" {
-                        cash_rebalanced = true;
-                    } else {
-                        crypto_rebalanced = true;
-                    }
-
-                } else if (current_percentage - movement_tolerance) < previous_percentage {    // asset allocation decreased compared to previous dataset
-                    if asset_curr.ticker == "USD" {
-                        cash_rebalanced = true;
-                    } else {
-                        crypto_rebalanced = true;
-                    }
-                }
-                // let compared = (current_percentage / previous_percentage * 100.0) as i64;
-                // if compared < 85 || compared > 115 { // if asset token amount differs with 5%, we assume that a rebalance happened 
-                // }
-
-                debug!("**{}** percentage **{}%** was **{}%**\n",asset_curr.ticker, current_percentage, previous_percentage);
-                return_value.push_str(&format!("**{}** percentage **{}%** was **{}%**\n",asset_curr.ticker, current_percentage, previous_percentage));
-            }
-        }
-        if !asset_found { // if we can't find one of the assets in the previous dataset that is part of the fund now, we can assume that a rebalance happened 
-            crypto_rebalanced = true;
-            return_value.push_str(&format!("**{}** new token in the fund *({})*\n", asset_curr.ticker, asset_curr.amount));
-        }
-    }
-
-    (crypto_rebalanced, cash_rebalanced, return_value)
-}
 struct RebalanceControl {
     previous_values: Vec<PieAsset>,
     current_values: Vec<PieAsset>,
