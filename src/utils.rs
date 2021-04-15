@@ -103,7 +103,7 @@ pub async fn c10_rebalance_check(http: &Http) {
             cash_rebalanced = true;
             cash_rebalance_string.push_str("Cash")
 
-        } else if (previous_cash_allocation.expect("prev cash alloc1") + allowed_percentage_difference) > current_cash_allocation.expect("current cash 1") {
+        } else if (previous_cash_allocation.expect("prev cash alloc1") - allowed_percentage_difference) > current_cash_allocation.expect("current cash 1") {
             //moved to crypto
             cash_rebalanced = true;
             cash_rebalance_string.push_str("Crypto")
