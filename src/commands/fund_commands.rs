@@ -1,3 +1,4 @@
+use invictus_api::normalize_fund_name;
 use serenity::framework::standard::{macros::command, Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
@@ -13,7 +14,7 @@ pub async fn nav(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
         if fund.name == "crypto10" {
             let mut nav = fund.nav_per_token;
             nav.truncate(5);
-            msg.channel_id.say(&ctx.http, format!("*NAV:*\n**{}$**", nav)).await?;
+            msg.channel_id.say(&ctx.http, format!("***NAV:***\n**{}$**", nav)).await?;
             fund_found = true;
         }
     }
@@ -96,5 +97,33 @@ pub async fn info(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     // }
     // msg.channel_id.say(&ctx.http, format!("{}", summary)).await?;
     Ok(())
+}
+
+#[command]
+pub async fn perf(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let mut fund_name =String::new();
+    let mut range =String::new();
+    if args.len() == 0 {
+        fund_name  = "crypto10".to_string();
+        range  = "24h".to_string();
+    } else if args.len() == 1 {
+        fund_name  = "crypto10".to_string();
+        range  = args.single::<String>()?; 
+    } else if args.len() == 2 {
+        fund_name  = args.single::<String>()?;
+
+        match normalize_fund_name(&fund_name) {
+            Ok(checked_name) => fund_name = checked_name,
+            Err(_) => {
+                msg.reply_ping(&ctx.http, format!("Sorry I didn't understand *{}*\n", fund_name)).await?;
+                return Ok(())
+            }
+        };
+        range  = args.single::<String>()?; 
+    }
+    let api_response = invictus_api::fund_perf(&fund_name, &range).await?;
+    msg.channel_id.say(&ctx.http, format!("**{} {}%** *({})*\n", range, api_response, fund_name)).await?;
+    Ok(())
+
 }
 

@@ -13,12 +13,15 @@ use thousands::Separable;
 use crate::commands::invictus_api::*;
 
 pub async fn update_nick(http: &Http) {
+    let servers = vec![830580361632153630, 394318139036270596];
     loop {
-        let server = GuildId(830580361632153630); // test server guild id
         let mut status_message = nav_status().await;
         status_message.truncate(5);
-        server.edit_nickname(&http, Some(&format!("C10 NAV {}$", status_message))).await.unwrap(); // requires edit own nick permission
-        sleep(Duration::from_millis(60000)).await;
+        for server in servers.clone() {
+            let current_server = GuildId(server); // test server guild id
+            current_server.edit_nickname(&http, Some(&format!("C10 NAV {}$", status_message))).await.unwrap(); // requires edit own nick permission
+        }
+        sleep(Duration::from_secs(60)).await;
     }
 }
 
@@ -147,9 +150,6 @@ impl RebalanceControl {
                     asset_found = true;
                     let current_percentage:f64 = asset_curr.percentage.parse().unwrap();
                     let previous_percentage:f64 = asset_prev.percentage.parse().unwrap();
-                    // if asset_curr.ticker == "USD" {
-                    //     current_percentage += 11.0;
-                    // }
                     
                     if (current_percentage - self.movement_tolerance) > previous_percentage {           // asset allocation increased compared to previous dataset
                         if asset_curr.ticker == "USD" {

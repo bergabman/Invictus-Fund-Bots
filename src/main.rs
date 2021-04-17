@@ -32,7 +32,7 @@ mod utils;
 
 
 #[group]
-#[commands(quit, nav, mov, stats, info)]
+#[commands(quit, play, nav, mov, stats, info, perf, stake)]
 struct General;
 pub struct ShardManagerContainer;
 
@@ -46,10 +46,10 @@ struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
-        loop {
-            ctx.set_activity(Activity::playing(format!("24h {}%", api_c10_mov_time("24".into()).await.unwrap()))).await;
-            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
-        }
+        // loop {
+        //     ctx.set_activity(Activity::playing(format!("24h {}%", api_c10_mov_time("24".into()).await.unwrap()))).await;
+        //     tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+        // }
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {

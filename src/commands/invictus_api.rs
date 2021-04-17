@@ -1,5 +1,5 @@
 use serde_derive::{Serialize, Deserialize};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ApiFundsGeneral {
@@ -125,4 +125,31 @@ pub async fn api_c10_mov_time(timeframe: String) -> Result<String> {
         .json::<FundMovement>()
         .await?;
     Ok(fund_movement.percentage)
+}
+
+pub async fn fund_perf(fund_name: &String, range: &String) -> Result<String> {
+    let fund_performance = reqwest::get(format!("https://api.invictuscapital.com/v2/funds/{}/movement?range={}", fund_name, range))
+        .await?
+        .json::<FundPerf>()
+        .await?;
+    Ok(fund_performance.percentage)
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct FundPerf {
+    status: String,
+    pub percentage: String
+}
+
+pub fn normalize_fund_name(got_name: &str) -> Result<String> {
+    match got_name {
+        "c20" | "crypto20" | "C20" => Ok("crypto20".into()),
+        "c10" | "crypto10" | "C10" => Ok("crypto10".into()),
+        "iba" | "bitcoin-alpha" | "IBA" => Ok("bitcoin-alpha".into()),
+        "ihf" | "hyperion" | "IHF" => Ok("hyperion".into()),
+        "iml" | "margin-lending" | "IML" => Ok("margin-lending".into()),
+        "igp" | "gold-plus" | "IGP" => Ok("gold-plus".into()),
+        "ems" | "emerging-markets-solar" | "EMS" => Ok("emerging-markets-solar".into()),
+        &_ => return Err(anyhow!("notfound"))
+    }
 }
