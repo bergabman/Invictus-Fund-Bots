@@ -127,7 +127,7 @@ pub async fn api_c10_mov_time(timeframe: String) -> Result<String> {
     Ok(fund_movement.percentage)
 }
 
-pub async fn fund_perf(fund_name: &String, range: &String) -> Result<String> {
+pub async fn fund_perf(fund_name: &str, range: &str) -> Result<String> {
     let fund_performance = reqwest::get(format!("https://api.invictuscapital.com/v2/funds/{}/movement?range={}", fund_name, range))
         .await?
         .json::<FundPerf>()

@@ -32,7 +32,7 @@ mod utils;
 
 
 #[group]
-#[commands(quit, play, nav, mov, stats, info, perf, stake)]
+#[commands(quit, play, nav, mov, stats, info, perf, stake, help)]
 struct General;
 pub struct ShardManagerContainer;
 
