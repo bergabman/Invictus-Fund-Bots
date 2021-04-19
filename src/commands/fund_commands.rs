@@ -155,6 +155,7 @@ pub async fn help(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 
     let mut perf_help = String::from("Fund performance, without arguments returns the past 1 year of C10 performance.\n");
     perf_help.push_str("`-perf <timerange>` returns the C10 fund preformance summary for the given timerange.\n");
+    perf_help.push_str("`-perf <ticker>` returns the given fund preformance summary for the past 1 year.\n");
     perf_help.push_str("`-perf <ticker> <timerange>` returns the given fund performance summary for the given timerange.\n");
     perf_help.push_str("(ex):\n`-perf c20` for C20 fund performance summary of past 1 year\n");
     perf_help.push_str("`-perf c20 4w` for C20 fund performance summary of past 4 weeks \n");
@@ -163,7 +164,7 @@ pub async fn help(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
         m.embed(|e| {
             e.title("C10 bot help");
             e.description("C10 bot available commands, explanations and examples.");
-            e.thumbnail("https://cdn.discordapp.com/attachments/519973500535046148/831645350548734002/c10_.png");
+            e.thumbnail("https://cdn.discordapp.com/attachments/519973500535046148/833745934881259591/10_.png");
             e.field("-help", "This help message.", false);
             e.field("-info", "Useful links.", false);
             e.field("-nav", "Current C10 token value. No arguments needed.", false);
@@ -171,7 +172,6 @@ pub async fn help(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
             e.field("-perf", perf_help, false);
             e
         });
-    
         m
     }).await?;
     Ok(())
