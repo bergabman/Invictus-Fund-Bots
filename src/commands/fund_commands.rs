@@ -6,18 +6,36 @@ use crate::commands::invictus_api;
 use thousands::Separable;
 
 #[command]
-pub async fn nav(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+pub async fn nav(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let mut fund_to_check = String::new();
     let api_response = invictus_api::api_general().await?;
     let funds_general_raw = api_response.data;
     let mut fund_found = false;
+
+    if args.len() == 0 {
+        fund_to_check  = "crypto10".to_string();
+    } else if args.len() == 1 {
+        let arg = args.single::<String>()?;
+        match normalize_fund_name(&arg) {
+            Ok(checked_name) => {
+                fund_to_check = checked_name;
+            }
+            Err(_) => {
+                msg.reply(&ctx.http, "Unknown fund").await?;
+                return Ok(())
+            }
+        };
+    }
+    
     for fund in funds_general_raw {
-        if fund.name == "crypto10" {
+        if fund.name == fund_to_check {
             let mut nav = fund.nav_per_token;
             nav.truncate(5);
-            msg.channel_id.say(&ctx.http, format!("***NAV:***\n**{}$**", nav)).await?;
+            msg.channel_id.say(&ctx.http, format!("***{} NAV:***\n**{}$**", fund_to_check, nav)).await?;
             fund_found = true;
         }
     }
+
     if !fund_found {
         msg.channel_id.say(&ctx.http, format!("Cannot find fund in received data")).await?;
     }
