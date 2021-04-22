@@ -43,14 +43,6 @@ pub async fn nav(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult 
 }
 
 #[command]
-pub async fn mov(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
-    let api_response = invictus_api::api_c10_mov().await?;
-
-    msg.channel_id.say(&ctx.http, format!("**Fund movements**\n{}", api_response)).await?;
-    Ok(())
-}
-
-#[command]
 pub async fn stats(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let mut api_response = invictus_api::api_c10_pie().await?;
     api_response.remove_small_assets();

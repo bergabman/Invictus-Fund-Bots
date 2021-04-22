@@ -4,7 +4,6 @@ use serenity::{
     http::Http,
     model::id::GuildId,
     model::id::ChannelId,
-    // model::gateway::Activity,
     };
 
 use tracing::{info, debug};
