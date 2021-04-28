@@ -62,8 +62,9 @@ pub fn loadconfig() -> Result<Config> {
 pub async fn c10_rebalance_check(http: &Http) {
 
     let mut previous_asset_values: Vec<PieAsset> = vec![];
-    let rebalance_channel = ChannelId(831545825753694229); //  rebalance channel ID in test server
+    let rebalance_channels = ChannelId(831545825753694229); //  rebalance channel ID in test server
     // let rebalance_channel = ChannelId(830739714054291486); //  bot-test channel ID in test server
+    let rebalance_channels = vec![ChannelId(831545825753694229), ChannelId(832461214083973140)]; //  rebalance channel ID in test server
 
     loop {
         let mut api_response = match api_c10_pie().await {
@@ -106,11 +107,14 @@ pub async fn c10_rebalance_check(http: &Http) {
 
             rebalance_message.push_str(&format!("{}", control.asset_summary));
 
-            if let Err(why) = rebalance_channel.say(http,  rebalance_message).await {
-                info!("c10_rebalance_check failed to send alert\n{}", why);
-                sleep(Duration::from_secs(10)).await;
-                continue;    
-            };
+            for channel in &rebalance_channels {
+                if let Err(why) = channel.say(http,  &rebalance_message).await {
+                    info!("c10_rebalance_check failed to send alert\n{}", why);
+                    sleep(Duration::from_secs(10)).await;
+                    continue;    
+                };
+            }
+
             previous_asset_values = control.current_values;
         }
 

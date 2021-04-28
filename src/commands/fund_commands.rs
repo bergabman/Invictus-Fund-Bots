@@ -7,6 +7,9 @@ use thousands::Separable;
 
 #[command]
 pub async fn nav(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    if !in_allowed_channels(&msg.channel_id.0 ) {
+        return Ok(())
+    }
     let mut fund_to_check = String::new();
     let api_response = invictus_api::api_general().await?;
     let funds_general_raw = api_response.data;
@@ -44,6 +47,9 @@ pub async fn nav(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult 
 
 #[command]
 pub async fn stats(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+    if !in_allowed_channels(&msg.channel_id.0 ) {
+        return Ok(())
+    }
     let mut api_response = invictus_api::api_c10_pie().await?;
     api_response.remove_small_assets();
 
@@ -100,6 +106,9 @@ pub async fn info(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 
 #[command]
 pub async fn perf(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    if !in_allowed_channels(&msg.channel_id.0 ) {
+        return Ok(())
+    }
     let default_ranges = vec!["1h", "12h", "24h", "1w", "4w", "52w"];
     let mut fund_name = String::new();
     let mut range = String::new();
@@ -149,6 +158,9 @@ pub async fn perf(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
 
 #[command]
 pub async fn stake(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    if !in_allowed_channels(&msg.channel_id.0 ) {
+        return Ok(())
+    }
 
     if args.len() != 3 {
         msg.reply_ping(&ctx.http, "I need 3 arguments for the calculation: <amount> <token> <length>").await?;
@@ -162,6 +174,10 @@ pub async fn stake(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
 
 #[command]
 pub async fn help(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+
+    if !in_allowed_channels(&msg.channel_id.0 ) {
+        return Ok(())
+    }
 
     let mut perf_help = String::from("Fund performance, without arguments returns the past 1 year of C10 performance.\n");
     perf_help.push_str("`-perf <timerange>` returns the C10 fund preformance summary for the given timerange.\n");
@@ -185,4 +201,20 @@ pub async fn help(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
         m
     }).await?;
     Ok(())
+}
+
+fn in_allowed_channels(id: &u64) -> bool {
+    let allowed_channels = vec![
+        832463266873606204, // stats in c20
+        832461214083973140, // rebalance in c20
+        830580361632153633, // general in c10
+        831545825753694229, // rebalance in c10
+        832333420071616572, // bot-commands in c10
+        830739714054291486, // bot-test in c10
+        ];
+
+    if allowed_channels.contains(id) {
+        return true
+    }
+    false
 }

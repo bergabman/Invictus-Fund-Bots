@@ -61,15 +61,6 @@ impl Crypto10Pie {
     pub fn remove_small_assets(&mut self) {
         self.assets.retain(|asset| (asset.percentage.parse::<f64>().unwrap()) > 1.0 || asset.ticker == "USD");
     }
-
-    pub fn get_cash_allocation_percent(&self) -> Option<f64> {
-        for asset in &self.assets {
-            if asset.ticker == "USD" {
-                return Some(asset.percentage.parse::<f64>().unwrap())
-            }
-        }
-        return None;
-    }
 }
 
 impl Crypto10 {
@@ -92,21 +83,6 @@ pub async fn api_c10_full() -> Result<Crypto10> {
         .json::<Crypto10>()
         .await?;
     Ok(api_response)
-}
-
-pub async fn api_c10_mov() -> Result<String> {
-    let time_ranges = vec!["1", "12", "24"];
-    let mut movements = String::new();
-
-    for range in time_ranges {
-        let fund_movement = reqwest::get(format!("https://api.invictuscapital.com/v2/funds/crypto10/movement?range={}h", range))
-        .await?
-        .json::<FundMovement>()
-        .await?;
-        movements.push_str(&format!("**{}h** {}%\n", range, fund_movement.percentage));
-    }
-    
-    Ok(movements)
 }
 
 pub async fn api_c10_pie() -> Result<Crypto10Pie> {
