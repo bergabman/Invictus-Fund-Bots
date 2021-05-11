@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+    "base",
+    "c10",
+    "icap",
+    "invictus_api",
+]

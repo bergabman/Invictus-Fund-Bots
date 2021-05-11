@@ -1,0 +1,11 @@
+fund_ticker = "C20"
+
+bot_token = ""
+
+update_frequency = 300
+
+playing = "1d"
+
+prefix = "-"
+
+allowed_channels = [ ]

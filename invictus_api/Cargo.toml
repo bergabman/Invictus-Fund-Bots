@@ -1,0 +1,11 @@
+[package]
+name = "invictus_api"
+version = "0.1.0"
+authors = ["bergabman <bergabman@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1"
+serde = "1.0"
+serde_derive = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
