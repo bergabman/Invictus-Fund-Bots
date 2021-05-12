@@ -45,7 +45,7 @@ pub async fn update_nick_and_activity(ctx: Arc<Context>, fund_ticker: &str, guil
                 continue;
             },
         };
-        fund_nav.truncate(fund_nav.find(".").unwrap() + 4);
+        fund_nav.truncate(fund_nav.find(".").unwrap_or(1) + 4);
         for server in guilds.clone() {
             if let Err(e) = server.edit_nickname(&ctx.http, Some(&format!("{} ${} {}",fund_ticker, fund_nav, trend))).await {
                 info!("{} failed to update nick with nav\n{}", &fund_ticker, e);
