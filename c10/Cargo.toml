@@ -17,3 +17,5 @@ anyhow = "1.0"
 toml = "0.5"
 thousands = "0.2.0"
 invictus_api = { path = "../invictus_api/"}
+uniswap_v2_api = { path = "../uniswap_v2_api/"}
+etherscan_io_api = { path = "../etherscan_io_api/"}

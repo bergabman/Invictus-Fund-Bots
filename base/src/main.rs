@@ -29,7 +29,7 @@ use commands::{
 mod utils;
 
 #[group]
-#[commands(quit)]
+#[commands(quit, re)]
 struct General;
 pub struct ShardManagerContainer;
 

@@ -1,5 +1,5 @@
 [package]
-name = "base"
+name = "ic_pricebot"
 version = "0.1.0"
 authors = ["bergabman"]
 edition = "2018"
@@ -17,3 +17,4 @@ anyhow = "1.0"
 toml = "0.5"
 thousands = "0.2.0"
 invictus_api = { path = "../invictus_api/"}
+uniswap_v2_api = { path = "../uniswap_v2_api/"}

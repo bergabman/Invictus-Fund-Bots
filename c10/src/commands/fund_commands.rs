@@ -1,13 +1,18 @@
-use invictus_api::*;
 use serenity::framework::standard::{macros::command, Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 
 use thousands::Separable;
+use tracing::{error, info, debug};
+
+use invictus_api::*;
+use uniswap_v2_api as uniswap;
+use etherscan_io_api as etherscan;
+// use etherscan_io_api::{get_block_by_timestamp, get_last_block_num, eth_price, Epoch};
 
 #[command]
 pub async fn nav(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    
+
     let mut fund_to_check = String::new();
     let api_response = api_general().await?;
     let funds_general_raw = api_response.data;
@@ -16,24 +21,30 @@ pub async fn nav(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult 
     if args.len() == 0 {
         fund_to_check  = "crypto10".to_string();
     } else if args.len() == 1 {
-        let arg = args.single::<String>()?;
-        match normalize_fund_name(&arg) {
-            Ok(checked_name) => {
-                fund_to_check = checked_name;
-            }
-            Err(_) => {
-                msg.reply(&ctx.http, "Unknown fund").await?;
-                return Ok(())
-            }
-        };
-    }
-    
-    for fund in funds_general_raw {
-        if fund.name == fund_to_check {
-            let mut nav = fund.nav_per_token;
-            nav.truncate(5);
-            msg.channel_id.say(&ctx.http, format!("***{} NAV:***\n**{}$**", fund_to_check, nav)).await?;
+        let fund_name = args.single::<String>()?;
+        if fund_name.to_lowercase() == "icap" {
+            let mut nav = uniswap::fund_nav(&fund_name).await.unwrap_or("failed".into());
+            nav.truncate(nav.find(".").unwrap_or(1) + 4);
+            msg.channel_id.say(&ctx.http, format!("***{} NAV:***\n**{}$**", fund_name.to_uppercase(), nav)).await?;
             fund_found = true;
+        } else {
+            match normalize_fund_name(&fund_name) {
+                Ok(checked_name) => {
+                    fund_to_check = checked_name;
+                }
+                Err(_) => {
+                    msg.reply(&ctx.http, "Unknown fund").await?;
+                    return Ok(());
+                }
+            };
+            for fund in funds_general_raw {
+                if fund.name == fund_to_check {
+                    let mut nav = fund.nav_per_token;
+                    nav.truncate(nav.find(".").unwrap_or(1) + 4);
+                    msg.channel_id.say(&ctx.http, format!("***{} NAV:***\n**{}$**", fund_name.to_uppercase(), nav)).await?;
+                    fund_found = true;
+                }
+            }
         }
     }
 
@@ -71,7 +82,7 @@ pub async fn stats(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     let fund_nav = FundNav::fund_nav(&fund_to_check).await?;
     let fund_net_value = (fund_nav.net_asset_value().parse::<f64>().unwrap()) as i64;
 
-    let mut summary = String::from(format!("*{}*\n", fund_to_check));
+    let mut summary = String::from(format!("*{}*\n", fund_to_check.to_uppercase()));
     summary.push_str(&format!("**Fund Net Value**: ${}\n", fund_net_value.separate_with_commas()));
     for asset in api_response.assets {
         let asset_usd = (asset.value.parse::<f64>().unwrap()) as i64;
@@ -87,48 +98,60 @@ pub async fn perf(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
     
     let default_ranges = vec!["1h", "12h", "24h", "1w", "4w", "52w"];
     let mut fund_name = String::new();
-    let mut range = String::new();
+    // let mut range = String::new();
     let mut return_message = String::new();
     if args.len() == 0 {
-        fund_name  = "crypto10".to_string();
+        fund_name  = "c10".to_string();
         for range in default_ranges {
-            let api_response = fund_perf(&fund_name, range).await?;
+            let api_response = fund_perf("crypto10", range).await?;
             return_message.push_str(&format!("**{} {}%**\n", range, api_response))
         }
     } else if args.len() == 1 {
-        let arg = args.single::<String>()?;
-        match normalize_fund_name(&arg) {
-            Ok(checked_name) => {
-                fund_name = checked_name;
-                for range in default_ranges {
-                    let api_response = fund_perf(&fund_name, range).await?;
-                    return_message.push_str(&format!("**{} {}%**\n", range, api_response))
+        fund_name = args.single::<String>()?;
+        // println!("fund name {}", fund_name);
+        if fund_name.to_lowercase() == "icap" {
+            for range in default_ranges {
+                let api_response = uniswap::fund_perf(uniswap::ICAP, range).await.unwrap();
+                return_message.push_str(&format!("**{} {}%**\n", range, api_response))
+            }
+        } else {
+            match normalize_fund_name(&fund_name) {
+                Ok(checked_name) => {
+                    // fund_name = checked_name;
+                    for range in default_ranges {
+                        let api_response = fund_perf(&checked_name, range).await?;
+                        return_message.push_str(&format!("**{} {}%**\n", range, api_response))
+                    }
+                }
+                Err(_) => {
+                    msg.reply(&ctx.http, "Unknown fund").await?;
+                    return Ok(())
                 }
             }
-            Err(_) => {
-                msg.reply(&ctx.http, "Unknown fund").await?;
-                return Ok(())
-            }
-        };
+        }
     } else if args.len() == 2 {
-        fund_name  = args.single::<String>()?;
-        range  = args.single::<String>()?;
+        fund_name = args.single::<String>()?;
+        let range = args.single::<String>()?;
+        let mut api_response = String::new();
 
-        match normalize_fund_name(&fund_name) {
-            Ok(checked_name) => fund_name = checked_name,
-            Err(_) => {
-                msg.reply(&ctx.http, "Unknown fund").await?;
-                return Ok(())
-            }
-        };
-
-        let api_response = fund_perf(&fund_name, &range).await?;
+        if fund_name.to_lowercase() == "icap" {
+            api_response = uniswap::fund_perf(uniswap::ICAP, &range).await.unwrap();
+        } else {
+            match normalize_fund_name(&fund_name) {
+                Ok(checked_name) => {
+                    api_response = fund_perf(&checked_name, &range).await?;
+                },
+                Err(_) => {
+                    msg.reply(&ctx.http, "Unknown fund").await?;
+                    return Ok(())
+                }
+            };
+        }
         return_message.push_str(&format!("**{} {}%**\n", range, api_response))
     }
     
-    msg.channel_id.say(&ctx.http, format!("*{}*\n{}", fund_name, return_message)).await?;
+    msg.channel_id.say(&ctx.http, format!("***{} performance***\n{}", fund_name.to_uppercase(), return_message)).await?;
     Ok(())
-
 }
 
 // #[command]
@@ -196,3 +219,51 @@ pub async fn help(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     Ok(())
 }
 
+#[command]
+pub async fn tab(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let epoch = etherscan::Epoch::now();
+    // let mut fund_to_check = String::new();
+    // let api_response = api_general().await?;
+    let last_b = etherscan::get_last_block_num().await?;
+    // msg.channel_id.say(&ctx.http, format!("last ETH block {}", last_b)).await?;
+    let weekago = etherscan::get_block_by_timestamp(&format!("{}", etherscan::Epoch::weeks_ago(epoch, 1))).await?;
+    // msg.channel_id.say(&ctx.http, format!("1w ago ETH block {}", weekago)).await?;
+    let eth_price = uniswap::eth_price_at_block(last_b - 10).await.unwrap();
+    // msg.channel_id.say(&ctx.http, format!("eth price {}", eth_price)).await.unwrap();
+    let eth_price_weekago = uniswap::eth_price_at_block(weekago).await.unwrap();
+    // msg.channel_id.say(&ctx.http, format!("eth price 1w ago {}", eth_price_weekago)).await.unwrap();
+
+
+    let api_ = uniswap::token_price_at_block(uniswap::ICAP, last_b - 10).await?;
+    let api_2 = uniswap::token_price_at_block(uniswap::ICAP, weekago).await?;
+
+    // info!("{}", api_);
+    // let funds_general_raw = api_response.data;
+    // let mut fund_found = false;
+    let icap_price_now = api_ * eth_price;
+    let icap_price_1w = api_2 * eth_price_weekago;
+
+    let mut percentage = (icap_price_1w * icap_price_now - 100.0).to_string();
+    percentage.truncate(percentage.find(".").unwrap_or(1) + 3);
+
+
+    // msg.channel_id.say(&ctx.http, format!("ICAP {}", api_ * eth_price)).await?;
+    // msg.channel_id.say(&ctx.http, format!("ICAP 1 week ago {}", api_2 * eth_price_weekago)).await?;
+    msg.channel_id.say(&ctx.http, format!("1w perf {}%", percentage)).await?;
+
+ 
+    Ok(())
+}
+
+#[command]
+pub async fn stake(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+   
+    if args.len() != 3 {
+        msg.reply_ping(&ctx.http, "I need 3 arguments for the calculation: <amount> <token> <length>").await?;
+        return Ok(())
+    }
+
+    msg.channel_id.say(&ctx.http, format!("** %** *()*\n",)).await?;
+    Ok(())
+
+}

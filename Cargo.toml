@@ -5,4 +5,6 @@ members = [
     "c10",
     "icap",
     "invictus_api",
+    "uniswap_v2_api",
+    "etherscan_io_api",
 ]
