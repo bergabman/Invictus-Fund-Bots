@@ -187,3 +187,18 @@ impl RebalanceControl {
         }
     }
 }
+
+
+pub fn get_last_rebalance_info(ticker: &str) -> Result<RebalanceInfo> {
+    let filename = format!("{}lrb.toml", ticker);
+    let fund_rebalance_info_string = std::fs::read_to_string(filename).unwrap();
+    let fund_rebalance_info: RebalanceInfo = toml::from_str(&fund_rebalance_info_string).unwrap();
+    Ok(fund_rebalance_info)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RebalanceInfo {
+    pub date: String,
+    pub lrb_type: String,
+    pub stats: Vec<String>,
+}

@@ -10,3 +10,4 @@ Cargo.lock
 
 # Bot configuration file
 **/botconfig.toml
+**/c10lrb.toml

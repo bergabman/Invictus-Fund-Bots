@@ -8,6 +8,7 @@ use tracing::{error, info, debug};
 use invictus_api::*;
 use uniswap_v2_api as uniswap;
 use etherscan_io_api as etherscan;
+use crate::utils;
 // use etherscan_io_api::{get_block_by_timestamp, get_last_block_num, eth_price, Epoch};
 
 #[command]
@@ -133,6 +134,13 @@ pub async fn perf(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
         fund_name = args.single::<String>()?;
         let range = args.single::<String>()?;
         let mut api_response = String::new();
+        // if range.to_lowercase().ends_with("w") {
+        //     let num_weeks = range.to_lowercase().replace("w", "").parse::<i64>()?;
+        //     if num_weeks > 26 {
+        //         msg.reply(&ctx.http, "Max 26w").await?;
+        //         return Ok(())
+        //     }
+        // }
 
         if fund_name.to_lowercase() == "icap" {
             api_response = uniswap::fund_perf(uniswap::ICAP, &range).await.unwrap();
@@ -150,7 +158,7 @@ pub async fn perf(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
         return_message.push_str(&format!("**{} {}%**\n", range, api_response))
     }
     
-    msg.channel_id.say(&ctx.http, format!("***{} performance***\n{}", fund_name.to_uppercase(), return_message)).await?;
+    msg.channel_id.say(&ctx.http, format!("***{} performance***\n{}", fund_name.to_uppercase(), return_message.replace("24h", "1d").replace("4w", "1m").replace("52w", "1y"))).await?;
     Ok(())
 }
 
@@ -220,40 +228,24 @@ pub async fn help(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 }
 
 #[command]
-pub async fn tab(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let epoch = etherscan::Epoch::now();
-    // let mut fund_to_check = String::new();
-    // let api_response = api_general().await?;
-    let last_b = etherscan::get_last_block_num().await?;
-    // msg.channel_id.say(&ctx.http, format!("last ETH block {}", last_b)).await?;
-    let weekago = etherscan::get_block_by_timestamp(&format!("{}", etherscan::Epoch::weeks_ago(epoch, 1))).await?;
-    // msg.channel_id.say(&ctx.http, format!("1w ago ETH block {}", weekago)).await?;
-    let eth_price = uniswap::eth_price_at_block(last_b - 10).await.unwrap();
-    // msg.channel_id.say(&ctx.http, format!("eth price {}", eth_price)).await.unwrap();
-    let eth_price_weekago = uniswap::eth_price_at_block(weekago).await.unwrap();
-    // msg.channel_id.say(&ctx.http, format!("eth price 1w ago {}", eth_price_weekago)).await.unwrap();
-
-
-    let api_ = uniswap::token_price_at_block(uniswap::ICAP, last_b - 10).await?;
-    let api_2 = uniswap::token_price_at_block(uniswap::ICAP, weekago).await?;
-
-    // info!("{}", api_);
-    // let funds_general_raw = api_response.data;
-    // let mut fund_found = false;
-    let icap_price_now = api_ * eth_price;
-    let icap_price_1w = api_2 * eth_price_weekago;
-
-    let mut percentage = (icap_price_1w * icap_price_now - 100.0).to_string();
-    percentage.truncate(percentage.find(".").unwrap_or(1) + 3);
-
-
-    // msg.channel_id.say(&ctx.http, format!("ICAP {}", api_ * eth_price)).await?;
-    // msg.channel_id.say(&ctx.http, format!("ICAP 1 week ago {}", api_2 * eth_price_weekago)).await?;
-    msg.channel_id.say(&ctx.http, format!("1w perf {}%", percentage)).await?;
-
- 
+pub async fn lrb(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    if args.len() != 1 {
+        msg.reply_ping(&ctx.http, "Command usage\n-lrb <fund_ticker>\neg:\n`-lrb c10`").await?;
+    }
+    let fund_ticker = args.single::<String>()?;
+    let fund_rebalance_info = utils::get_last_rebalance_info(&fund_ticker.to_lowercase())?;
+    let stats: String = fund_rebalance_info.stats.join("\n");
+    msg.channel_id.say(&ctx.http, format!("{} last rebalance\n**{}**\n{}", fund_ticker, fund_rebalance_info.date, stats )).await?;
     Ok(())
 }
+
+
+
+
+// #[command]
+// pub async fn lrbs(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+  
+// }
 
 #[command]
 pub async fn stake(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {

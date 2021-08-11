@@ -87,6 +87,7 @@ impl FundPie {
             match asset.ticker.as_ref() {
                 "USD" => {
                     asset.percentage = usd_percentage.to_string();
+                    asset.percentage.truncate(asset.percentage.find(".").unwrap_or(1) + 3);
                     asset.value = usd_value.to_string();
                 }
                 &_ => {}
